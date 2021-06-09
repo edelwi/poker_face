@@ -20,6 +20,11 @@ file_handler.setFormatter(logging.Formatter(
 file_handler.setLevel(logging.INFO)
 log.addHandler(file_handler)
 
+LEFT_FACE_MARGIN_FACTOR = 0.66
+RIGHT_FACE_MARGIN_FACTOR = 0.66
+
+TOP_FACE_MARGIN_FACTOR = 0.5
+BOTTOM_FACE_MARGIN_FACTOR = 0.5
 
 class FaceNotFound(Exception):
     """ FaceNotFound exception class.
@@ -36,48 +41,35 @@ class FaceNotFound(Exception):
         return self.value
 
 
-def create_dir(full_dir_path):
+def create_dir(full_dir_path: str):
     if not os.path.exists(full_dir_path):
         os.makedirs(full_dir_path)
 
 
-def get_avatars(image, top, right, bottom, left):
+def get_faces(image: Image, top: int, right: int, bottom: int, left: int) -> Image:
     height, width, c = image.shape
 
     f_height = bottom - top
     f_width = right - left
 
-    top_shift = int(f_height // 1.5)
-    bottom_shift = int(f_height // 1.5)
+    top_shift = int(round(f_height * TOP_FACE_MARGIN_FACTOR))
+    bottom_shift = int(round(f_height * BOTTOM_FACE_MARGIN_FACTOR))
 
-    left_shift = f_width // 2
-    right_shift = f_width // 2
+    left_shift = int(round(f_width * LEFT_FACE_MARGIN_FACTOR))
+    right_shift = int(round(f_width * RIGHT_FACE_MARGIN_FACTOR))
 
     new_top = top - top_shift if top - top_shift >= 0 else 0
-    # delta_top = - top - top_shift if top - top_shift < 0 else 0
-    # if delta_top: print(f'^^ {delta_top}')
-
     new_bottom = bottom + bottom_shift if bottom + bottom_shift <= height else height
-    # delta_bottom = width - bottom + bottom_shift if bottom + bottom_shift > width else 0
-    # if delta_bottom: print(f'vv {delta_bottom}')
-
     new_left = left - left_shift if left - left_shift >= 0 else 0
-    # delta_left = -left - left_shift if left - left_shift < 0 else 0
-    # if delta_left: print(f'<< {delta_left}')
-
     new_right = right + right_shift if right + right_shift <= width else width
-    # delta_right = width - right + right_shift if right + right_shift > width else 0
-    # if delta_right: print(f'>> {delta_right}')
 
     face_image = image[new_top:new_bottom, new_left:new_right]
     pil_image = Image.fromarray(face_image)
-    # print(f'{width =}, {height =}')
-    # print(f'{top =}, {right =}, {bottom =}, {left =} ==> {new_top =}, {new_right =}, {new_bottom =}, {new_left =}')
+
     return pil_image
 
 
-def get_faces(file_name):
-
+def get_portraits(file_name: str) -> list(Image):
     try:
         image = face_recognition.load_image_file(file_name)
     except UnidentifiedImageError as e:
@@ -90,14 +82,14 @@ def get_faces(file_name):
     elif len(face_locations) >= 1:
         faces = []
         for n, face_location in enumerate(face_locations):
-            faces.append(get_avatars(image, *face_location))
+            faces.append(get_faces(image, *face_location))
         return faces
     else:
         log.warning(f'What is it {file_name}')
         raise FaceNotFound(f'What is it {file_name}')
 
 
-def set_size(img, max_width=150, max_height=200):
+def set_size(img: Image, max_width: int = 150, max_height: int = 200) -> Image:
     if img.size[0] == 0 or img.size[1] == 0:
         return
     elif img.size[0] <= max_width and img.size[1] <= max_height:
@@ -111,7 +103,7 @@ def set_size(img, max_width=150, max_height=200):
     return img_resized
 
 
-def runner(resize=None):  # resize: {'max_width': 150, 'max_height': 200}
+def runner(resize: dict = None):  # resize: {'max_width': 150, 'max_height': 200}
     t0 = time.time()
     base_dir = os.path.dirname(__file__)
     if os.path.isabs(IMG_DIR):
@@ -140,7 +132,7 @@ def runner(resize=None):  # resize: {'max_width': 150, 'max_height': 200}
         file_name_base = os.path.basename(img_file)
         i += 1
         try:
-            faces = get_faces(img_file_full)
+            faces = get_portraits(img_file_full)
         except UnidentifiedImageError as e:
             f += 1
             copyfile(img_file_full, os.path.join(pic_fail, file_name_base))
